@@ -5,7 +5,7 @@ FROM python:3
 WORKDIR /app
 
 # Install dependencies
-RUN pip3 install agentql asyncio playwright python-dotenv
+RUN pip3 install agentql asyncio playwright python-dotenv pymongo flask
 
 # Install Playwright browsers
 RUN playwright install

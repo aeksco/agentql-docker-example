@@ -1,101 +1,88 @@
 #!/usr/bin/env python3
-
-"""This is an example of collecting pricing data from e-commerce website using AgentQL."""
-
-# Import the Page class from the AgentQL Playwright extension
-# This enables the use of the AgentQL Smart Locator and Data Query API
+import asyncio
+import logging
 import os
+from typing import Dict, Any
+
 import agentql
+from pymongo import MongoClient
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from agentql.ext.playwright.sync_api import Page
 from playwright.sync_api import sync_playwright
 
+# Load environment variables
 load_dotenv()
 
-URL = "https://scrapeme.live/shop"
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
 
-# The AgentQL query to locate the search box element
-# More about AgentQL Query: https://docs.agentql.com/agentql-query/query-intro
-SEARCH_BOX_QUERY = """
+# Initialize Flask app
+app = Flask(__name__)
+
+# Initialize MongoDB connection
+mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+db_name = os.getenv("DB_NAME", "articles_db")
+client = MongoClient(mongo_uri)
+db = client[db_name]
+
+# AgentQL queries
+ARTICLE_QUERY = """
 {
-    search_product_box
+  article {
+    author
+    published_date(Format the output as an ISO 8601 date string)
+    title
+    image_url
+    body
+  }
 }
 """
 
-# The AgentQL query of the data to be extracted
-# More about AgentQL Query: https://docs.agentql.com/agentql-query/query-intro
-PRODUCT_DATA_QUERY = """
-{
-    price_currency
-    products[] {
-        name
-        price
-    }
-}
-"""
-
-# Other than the AgentQL query, you can also use natural language prompt to locate the element
-NATURAL_LANGUAGE_PROMPT = "Button to display Qwilfish page"
-
-
-def main():
-    with sync_playwright() as playwright, playwright.chromium.launch(headless=True) as browser:
-        # Create a new page in the browser and wrap it get access to the AgentQL's querying API
+def main(url: str) -> Dict[str, Any]:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
         page = agentql.wrap(browser.new_page())
+        page.goto(url)
 
-        page.goto(URL)
+        data = page.query_data(ARTICLE_QUERY)
 
-        product_data = _extract_product_data(
-            page,
-            search_key_word="fish",
-        )
+        browser.close()
+        return data
 
-        print(product_data)
+@app.route('/ingest', methods=['POST'])
+def ingest():
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({"error": "URL parameter is required in the JSON body"}), 400
+    
+    url = data['url']
+    articles = db.articles
+    result = articles.insert_one({'url': url, 'summary': None})
+    
+    return jsonify({"result": "Document inserted", "id": str(result.inserted_id)}), 201
 
-        _add_qwilfish_to_cart(page)
+@app.route('/process', methods=['GET'])
+def process_latest():
+    articles = db.articles
+    article = articles.find_one({'summary': None})
+    
+    if not article:
+        return jsonify({"message": "No unprocessed articles found"}), 404
 
+    url = article.get('url')
+    if not url:
+        return jsonify({"message": "No URL found for the article"}), 404
 
-def _extract_product_data(page: Page, search_key_word: str) -> dict:
-    """Extract product data.
-
-    Args:
-        page (Page): The Playwright page object to interact with the browser.
-        search_key_word (str): The product to search for.
-
-    Returns:
-        dict: The product data extracted from the page.
-    """
-    # Find DOM element using AgentQL API's query_elements() method
-    response = page.query_elements(SEARCH_BOX_QUERY)
-
-    # Interact with the element using Playwright API
-    # API Doc: https://playwright.dev/python/docs/input#text-input
-    response.search_product_box.type(search_key_word, delay=200)
-    page.keyboard.press("Enter")
-
-    # Extract data using AgentQL API's query_data() method
-    data = page.query_data(PRODUCT_DATA_QUERY)
-
-    return data
-
-
-def _add_qwilfish_to_cart(page: Page):
-    """Add Qwilfish to cart with AgentQL Smart Locator API.
-
-    Args:
-        page (Page): The Playwright page object to interact with the browser.
-    """
-    # Find DOM element using AgentQL API's get_by_prompt() method
-    qwilfish_page_btn = page.get_by_prompt(NATURAL_LANGUAGE_PROMPT)
-
-    # Interact with the element using Playwright API
-    # API Doc: https://playwright.dev/python/docs/api/class-locator#locator-click
-    if qwilfish_page_btn:
-        qwilfish_page_btn.click()
-
-    # Wait for 10 seconds to see the browser action
-    page.wait_for_timeout(10000)
-
-
-if __name__ == "__main__":
-    main()
+    summary = main(url)
+    
+    # Update the article with the summary
+    articles.update_one({'_id': article['_id']}, {'$set': {'summary': summary}})
+    
+    return jsonify({
+        "message": "Article processed successfully",
+        "article_id": str(article['_id']),
+        "url": article['url'],
+        "summary": summary
+    }), 200
