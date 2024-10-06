@@ -1,0 +1,35 @@
+version: "3"
+services:
+  app:
+    build: .
+    volumes:
+      - ./app:/app
+      - ./.env:/app/.env # mount the .env file
+    depends_on:
+      - mongodb
+    env_file:
+      - .env # load the .env file
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/myapp
+    ports:
+      - "8000:8000"
+
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+
+  mongo-express:
+    image: mongo-express:latest
+    depends_on:
+      - mongodb
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+
+volumes:
+  mongodb_data:
