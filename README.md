@@ -141,3 +141,5 @@ curl --location 'localhost:8000/process'
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for more details.
+
+Built with :heart: by [aeksco](https://twitter.com/aeksco)
