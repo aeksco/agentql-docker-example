@@ -3,7 +3,6 @@ import asyncio
 import logging
 import os
 from typing import Dict, Any
-
 import agentql
 from pymongo import MongoClient
 from flask import Flask, request, jsonify

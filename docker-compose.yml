@@ -21,6 +21,7 @@ services:
     ports:
       - "27017:27017"
 
+  # credentials: admin/pass
   mongo-express:
     image: mongo-express:latest
     depends_on:
