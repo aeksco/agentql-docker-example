@@ -74,8 +74,8 @@ The project uses Docker Compose to orchestrate the following services:
 4. Access the application at `http://localhost:8000`
 
 5. Access the MongoDB Express admin interface at `http://localhost:8081`
-   - Username: admin
-   - Password: pass
+   - Username: `admin`
+   - Password: `pass`
 
 ## Services
 
