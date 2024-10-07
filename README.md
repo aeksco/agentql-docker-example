@@ -123,7 +123,7 @@ The project uses a `.env` file for configuration. Make sure the following variab
 curl --location 'localhost:8000/ingest' \
 --header 'Content-Type: application/json' \
 --data '{
-    "url": "https://centrifuge.mirror.xyz/wQGnnIo89V0C1jIWvUcGGEQixrou5BjcZijjxQPNBlo?utm_source=rwa.xyz&utm_medium=referral&utm_campaign=news_aggregator"
+    "url": "https://centrifuge.mirror.xyz/wQGnnIo89V0C1jIWvUcGGEQixrou5BjcZijjxQPNBlo"
 }'
 ```
 
